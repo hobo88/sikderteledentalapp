@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import TitleHeader from "@/components/TitleHeader";
@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 const PaymentInstructions = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const roomId = searchParams.get("roomId");
   const callType = searchParams.get("type");
@@ -19,40 +20,37 @@ const PaymentInstructions = () => {
       return;
     }
 
-    console.log(`[Patient] Subscribing to real-time updates for room: ${roomId}`);
+    const checkPaymentStatus = async () => {
+      console.log(`[Patient] Polling for payment status for room: ${roomId}`);
+      const { data, error } = await supabase
+        .from('waiting_list')
+        .select('status')
+        .eq('room_id', roomId)
+        .single();
 
-    const channel = supabase
-      .channel(`payment-status-for-${roomId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'waiting_list',
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          console.log('[Patient] Real-time event received:', payload);
-          if (payload.new && payload.new.status === 'waiting') {
-            console.log('[Patient] Status is "waiting". Navigating to room...');
-            navigate(`/room/${roomId}?type=${callType}`);
-          } else {
-            console.log(`[Patient] Status is not 'waiting'. Current status: ${payload.new?.status}`);
-          }
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[Patient] Successfully subscribed to real-time channel.');
-        }
-        if (status === 'CHANNEL_ERROR' || err) {
-          console.error('[Patient] Subscription error:', err);
-        }
-      });
+      if (error) {
+        console.error('[Patient] Error polling for status:', error);
+        return;
+      }
 
+      if (data && data.status === 'waiting') {
+        console.log('[Patient] Payment confirmed via polling. Navigating to room...');
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        navigate(`/room/${roomId}?type=${callType}`);
+      }
+    };
+
+    // Check immediately and then start polling every 5 seconds
+    checkPaymentStatus();
+    intervalRef.current = setInterval(checkPaymentStatus, 5000);
+
+    // Cleanup function to clear the interval when the component unmounts
     return () => {
-      console.log(`[Patient] Unsubscribing from room: ${roomId}`);
-      supabase.removeChannel(channel);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     };
   }, [roomId, callType, navigate]);
 
