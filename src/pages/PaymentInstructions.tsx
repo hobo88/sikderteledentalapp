@@ -26,14 +26,15 @@ const PaymentInstructions = () => {
         .from('waiting_list')
         .select('status')
         .eq('room_id', roomId)
-        .single();
+        .limit(1); // Use limit(1) to get an array instead of a single object
 
       if (error) {
         console.error('[Patient] Error polling for status:', error);
-        return;
+        return; // Don't stop polling on error, just try again next interval
       }
 
-      if (data && data.status === 'waiting') {
+      // Check if we got a result and if the status is 'waiting'
+      if (data && data.length > 0 && data[0].status === 'waiting') {
         console.log('[Patient] Payment confirmed via polling. Navigating to room...');
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
