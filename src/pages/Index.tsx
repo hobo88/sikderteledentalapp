@@ -9,32 +9,31 @@ import TitleHeader from "@/components/TitleHeader";
 const Index = () => {
   const navigate = useNavigate();
 
-  const handleProceed = async (callType: 'video' | 'audio') => {
-    const toastId = showLoading("Processing your request...");
+  const handleProceed = async (callType: 'video' | 'audio', amount: number) => {
+    const toastId = showLoading("Generating your room...");
 
     // 1. Generate a unique room ID and patient name
     const roomId = `DENTAL-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     const patientName = `Patient-${Math.random().toString(36).substring(2, 6)}`;
 
-    // 2. Insert into the waiting list table with the selected call type
+    // 2. Insert into the waiting list table with 'pending_payment' status
     const { error } = await supabase
       .from("waiting_list")
       .insert([{ 
           patient_name: patientName, 
           room_id: roomId, 
-          status: "waiting",
+          status: "pending_payment",
           call_type: callType 
       }]);
 
     dismissToast(toastId);
 
     if (error) {
-      showError("Could not join the waiting list. Please try again.");
+      showError("Could not generate your room. Please try again.");
       console.error("Error inserting into waiting list:", error);
     } else {
-      showSuccess("You have been added to the waiting list!");
-      // 3. Redirect to the room, passing the call type
-      navigate(`/room/${roomId}?type=${callType}`);
+      // 3. Redirect to the payment instructions page
+      navigate(`/payment-instructions?roomId=${roomId}&type=${callType}&amount=${amount}`);
     }
   };
 
@@ -57,7 +56,7 @@ const Index = () => {
               <p className="text-4xl font-bold">tk. 800</p>
             </CardContent>
             <CardFooter>
-              <Button className="w-full" size="lg" onClick={() => handleProceed('video')}>
+              <Button className="w-full" size="lg" onClick={() => handleProceed('video', 800)}>
                 Proceed to Consultation
               </Button>
             </CardFooter>
@@ -72,7 +71,7 @@ const Index = () => {
               <p className="text-4xl font-bold">tk. 500</p>
             </CardContent>
             <CardFooter>
-              <Button className="w-full" size="lg" onClick={() => handleProceed('audio')}>
+              <Button className="w-full" size="lg" onClick={() => handleProceed('audio', 500)}>
                 Proceed to Consultation
               </Button>
             </CardFooter>
