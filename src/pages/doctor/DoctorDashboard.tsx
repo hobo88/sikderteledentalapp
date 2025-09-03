@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { showSuccess } from "@/utils/toast";
+import { Video, Phone } from "lucide-react";
 
 type Patient = {
   id: string;
@@ -13,6 +14,7 @@ type Patient = {
   patient_name: string;
   room_id: string;
   status: string;
+  call_type: 'video' | 'audio';
 };
 
 const DoctorDashboard = () => {
@@ -39,7 +41,7 @@ const DoctorDashboard = () => {
       if (error) {
         console.error("Error fetching waiting list:", error);
       } else {
-        setWaitingList(data);
+        setWaitingList(data as Patient[]);
       }
       setLoading(false);
     };
@@ -58,8 +60,8 @@ const DoctorDashboard = () => {
     };
   }, [navigate]);
 
-  const handleJoinCall = (roomId: string) => {
-    navigate(`/room/${roomId}`);
+  const handleJoinCall = (roomId: string, callType: 'video' | 'audio') => {
+    navigate(`/room/${roomId}?type=${callType}`);
   };
 
   const handleLogout = async () => {
@@ -84,6 +86,7 @@ const DoctorDashboard = () => {
               <TableRow>
                 <TableHead>Patient Name</TableHead>
                 <TableHead>Room ID</TableHead>
+                <TableHead>Call Type</TableHead>
                 <TableHead>Joined At</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
@@ -91,7 +94,7 @@ const DoctorDashboard = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">Loading...</TableCell>
+                  <TableCell colSpan={5} className="text-center">Loading...</TableCell>
                 </TableRow>
               ) : waitingList.length > 0 ? (
                 waitingList.map((patient) => (
@@ -100,15 +103,21 @@ const DoctorDashboard = () => {
                     <TableCell>
                       <Badge variant="secondary">{patient.room_id}</Badge>
                     </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {patient.call_type === 'video' ? <Video className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                        <span className="capitalize">{patient.call_type}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>{new Date(patient.created_at).toLocaleTimeString()}</TableCell>
                     <TableCell className="text-right">
-                      <Button onClick={() => handleJoinCall(patient.room_id)}>Join Call</Button>
+                      <Button onClick={() => handleJoinCall(patient.room_id, patient.call_type)}>Join Call</Button>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-12 text-gray-500">
+                  <TableCell colSpan={5} className="text-center py-12 text-gray-500">
                     No patients in the waiting list.
                   </TableCell>
                 </TableRow>

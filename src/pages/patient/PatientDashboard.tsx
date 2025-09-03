@@ -8,17 +8,22 @@ import { showLoading, dismissToast, showSuccess, showError } from "@/utils/toast
 const PatientDashboard = () => {
   const navigate = useNavigate();
 
-  const handlePayment = async () => {
+  const handleProceed = async (callType: 'video' | 'audio') => {
     const toastId = showLoading("Processing your request...");
 
-    // 1. Generate a unique room ID
+    // 1. Generate a unique room ID and patient name
     const roomId = `DENTAL-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     const patientName = `Patient-${Math.random().toString(36).substring(2, 6)}`;
 
-    // 2. Insert into the waiting list table
+    // 2. Insert into the waiting list table with the selected call type
     const { error } = await supabase
       .from("waiting_list")
-      .insert([{ patient_name: patientName, room_id: roomId, status: "waiting" }]);
+      .insert([{ 
+          patient_name: patientName, 
+          room_id: roomId, 
+          status: "waiting",
+          call_type: callType 
+      }]);
 
     dismissToast(toastId);
 
@@ -27,8 +32,8 @@ const PatientDashboard = () => {
       console.error("Error inserting into waiting list:", error);
     } else {
       showSuccess("You have been added to the waiting list!");
-      // 3. Redirect to the room
-      navigate(`/room/${roomId}`);
+      // 3. Redirect to the room, passing the call type
+      navigate(`/room/${roomId}?type=${callType}`);
     }
   };
 
@@ -50,7 +55,7 @@ const PatientDashboard = () => {
             <p className="text-sm text-muted-foreground">per 15-minute session</p>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" size="lg" onClick={handlePayment}>
+            <Button className="w-full" size="lg" onClick={() => handleProceed('video')}>
               Proceed to Consultation
             </Button>
           </CardFooter>
@@ -66,7 +71,7 @@ const PatientDashboard = () => {
             <p className="text-sm text-muted-foreground">per 15-minute session</p>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" size="lg" onClick={handlePayment}>
+            <Button className="w-full" size="lg" onClick={() => handleProceed('audio')}>
               Proceed to Consultation
             </Button>
           </CardFooter>
