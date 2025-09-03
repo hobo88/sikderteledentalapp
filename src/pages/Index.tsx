@@ -51,8 +51,7 @@ const Index = () => {
             <CardDescription>Face-to-face consultation</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <p className="text-4xl font-bold">$50</p>
-            <p className="text-sm text-muted-foreground">per 15-minute session</p>
+            <p className="text-4xl font-bold">tk. 800</p>
           </CardContent>
           <CardFooter>
             <Button className="w-full" size="lg" onClick={() => handleProceed('video')}>
@@ -67,8 +66,7 @@ const Index = () => {
             <CardDescription>Voice-only consultation</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <p className="text-4xl font-bold">$30</p>
-            <p className="text-sm text-muted-foreground">per 15-minute session</p>
+            <p className="text-4xl font-bold">tk. 500</p>
           </CardContent>
           <CardFooter>
             <Button className="w-full" size="lg" onClick={() => handleProceed('audio')}>
