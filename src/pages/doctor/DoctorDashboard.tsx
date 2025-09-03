@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { showSuccess } from "@/utils/toast";
 import { Video, Phone } from "lucide-react";
+import TitleHeader from "@/components/TitleHeader";
 
 type Patient = {
   id: string;
@@ -71,61 +72,64 @@ const DoctorDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8">
-      <header className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Doctor Dashboard</h1>
-        <Button variant="outline" onClick={handleLogout}>Logout</Button>
-      </header>
-      <Card>
-        <CardHeader>
-          <CardTitle>Patient Waiting List</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Patient Name</TableHead>
-                <TableHead>Room ID</TableHead>
-                <TableHead>Call Type</TableHead>
-                <TableHead>Joined At</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <TitleHeader />
+      <div className="flex-grow p-4 sm:p-6 md:p-8">
+        <header className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Doctor Dashboard</h1>
+          <Button variant="outline" onClick={handleLogout}>Logout</Button>
+        </header>
+        <Card>
+          <CardHeader>
+            <CardTitle>Patient Waiting List</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">Loading...</TableCell>
+                  <TableHead>Patient Name</TableHead>
+                  <TableHead>Room ID</TableHead>
+                  <TableHead>Call Type</TableHead>
+                  <TableHead>Joined At</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
-              ) : waitingList.length > 0 ? (
-                waitingList.map((patient) => (
-                  <TableRow key={patient.id}>
-                    <TableCell className="font-medium">{patient.patient_name}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{patient.room_id}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {patient.call_type === 'video' ? <Video className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
-                        <span className="capitalize">{patient.call_type}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{new Date(patient.created_at).toLocaleTimeString()}</TableCell>
-                    <TableCell className="text-right">
-                      <Button onClick={() => handleJoinCall(patient.room_id, patient.call_type)}>Join Call</Button>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center">Loading...</TableCell>
+                  </TableRow>
+                ) : waitingList.length > 0 ? (
+                  waitingList.map((patient) => (
+                    <TableRow key={patient.id}>
+                      <TableCell className="font-medium">{patient.patient_name}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{patient.room_id}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {patient.call_type === 'video' ? <Video className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                          <span className="capitalize">{patient.call_type}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{new Date(patient.created_at).toLocaleTimeString()}</TableCell>
+                      <TableCell className="text-right">
+                        <Button onClick={() => handleJoinCall(patient.room_id, patient.call_type)}>Join Call</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-12 text-gray-500">
+                      No patients in the waiting list.
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-gray-500">
-                    No patients in the waiting list.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
