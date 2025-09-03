@@ -9,23 +9,37 @@ const DoctorLogin = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let isMounted = true;
+
+    // This function checks for a session and redirects if found.
     const checkSessionAndRedirect = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate("/doctor/dashboard");
+      if (isMounted && session) {
+        return true; // Session found
       }
+      return false; // No session
     };
 
-    checkSessionAndRedirect();
+    // Poll for the session status.
+    const intervalId = setInterval(async () => {
+      const hasSession = await checkSessionAndRedirect();
+      if (hasSession) {
+        clearInterval(intervalId);
+        navigate("/doctor/dashboard");
+      }
+    }, 1500); // Check every 1.5 seconds
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN') {
+    // Perform an initial check immediately on component mount.
+    checkSessionAndRedirect().then(hasSession => {
+      if (hasSession) {
+        clearInterval(intervalId);
         navigate("/doctor/dashboard");
       }
     });
 
     return () => {
-      subscription.unsubscribe();
+      isMounted = false;
+      clearInterval(intervalId);
     };
   }, [navigate]);
 
