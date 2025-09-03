@@ -34,7 +34,6 @@ const DoctorDashboard = () => {
     checkSession();
 
     const fetchLists = async () => {
-      setLoading(true);
       const { data, error } = await supabase
         .from("waiting_list")
         .select("*")
@@ -43,7 +42,7 @@ const DoctorDashboard = () => {
 
       if (error) {
         console.error("Error fetching lists:", error);
-        showError("Could not fetch patient lists.");
+        // Don't show toast on every poll failure
       } else {
         const allPatients = data as Patient[];
         setPendingPatients(allPatients.filter(p => p.status === 'pending_payment'));
@@ -54,15 +53,10 @@ const DoctorDashboard = () => {
 
     fetchLists();
 
-    const channel = supabase
-      .channel('public:waiting_list')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'waiting_list' }, () => {
-        fetchLists();
-      })
-      .subscribe();
+    const intervalId = setInterval(fetchLists, 5000); // Poll every 5 seconds
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(intervalId);
     };
   }, [navigate]);
 
