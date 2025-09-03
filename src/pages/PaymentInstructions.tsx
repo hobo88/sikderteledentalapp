@@ -19,6 +19,8 @@ const PaymentInstructions = () => {
       return;
     }
 
+    console.log(`[Patient] Subscribing to real-time updates for room: ${roomId}`);
+
     const channel = supabase
       .channel(`payment-status-for-${roomId}`)
       .on(
@@ -30,14 +32,26 @@ const PaymentInstructions = () => {
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
-          if (payload.new.status === 'waiting') {
+          console.log('[Patient] Real-time event received:', payload);
+          if (payload.new && payload.new.status === 'waiting') {
+            console.log('[Patient] Status is "waiting". Navigating to room...');
             navigate(`/room/${roomId}?type=${callType}`);
+          } else {
+            console.log(`[Patient] Status is not 'waiting'. Current status: ${payload.new?.status}`);
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Patient] Successfully subscribed to real-time channel.');
+        }
+        if (status === 'CHANNEL_ERROR' || err) {
+          console.error('[Patient] Subscription error:', err);
+        }
+      });
 
     return () => {
+      console.log(`[Patient] Unsubscribing from room: ${roomId}`);
       supabase.removeChannel(channel);
     };
   }, [roomId, callType, navigate]);
