@@ -21,21 +21,19 @@ const PaymentInstructions = () => {
     }
 
     const checkPaymentStatus = async () => {
-      console.log(`[Patient] Polling for payment status for room: ${roomId}`);
-      const { data, error } = await supabase
-        .from('waiting_list')
-        .select('status')
-        .eq('room_id', roomId)
-        .limit(1); // Use limit(1) to get an array instead of a single object
+      console.log(`[Patient] Polling for payment status for room: ${roomId} using RPC.`);
+      
+      const { data: currentStatus, error } = await supabase.rpc('get_room_status', {
+        p_room_id: roomId
+      });
 
       if (error) {
-        console.error('[Patient] Error polling for status:', error);
-        return; // Don't stop polling on error, just try again next interval
+        console.error('[Patient] Error polling for status via RPC:', error);
+        return;
       }
 
-      // Check if we got a result and if the status is 'waiting'
-      if (data && data.length > 0 && data[0].status === 'waiting') {
-        console.log('[Patient] Payment confirmed via polling. Navigating to room...');
+      if (currentStatus === 'waiting') {
+        console.log('[Patient] Payment confirmed! Navigating to room...');
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
@@ -43,11 +41,9 @@ const PaymentInstructions = () => {
       }
     };
 
-    // Check immediately and then start polling every 5 seconds
     checkPaymentStatus();
-    intervalRef.current = setInterval(checkPaymentStatus, 5000);
+    intervalRef.current = setInterval(checkPaymentStatus, 3000); // Poll every 3 seconds
 
-    // Cleanup function to clear the interval when the component unmounts
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
