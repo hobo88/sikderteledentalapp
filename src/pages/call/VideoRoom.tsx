@@ -16,11 +16,11 @@ const VideoRoom = () => {
 
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
-  const [peer, setPeer] = useState<Peer | null>(null);
   const [isDoctor, setIsDoctor] = useState<boolean | undefined>(undefined);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const peerRef = useRef<Peer | null>(null);
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -34,7 +34,7 @@ const VideoRoom = () => {
     if (!roomId || isDoctor === undefined) return;
 
     let localStream: MediaStream;
-    let retryTimeout: NodeJS.Timeout;
+    let connectionInterval: NodeJS.Timeout;
 
     const initializePeer = async () => {
       try {
@@ -49,7 +49,7 @@ const VideoRoom = () => {
 
         const peerId = isDoctor ? `doctor-${roomId}` : `patient-${roomId}`;
         const peerInstance = new Peer(peerId);
-        setPeer(peerInstance);
+        peerRef.current = peerInstance;
 
         // Doctor logic: wait for a call
         if (isDoctor) {
@@ -64,32 +64,32 @@ const VideoRoom = () => {
           });
         }
 
-        // Patient logic: call the doctor, with retries
+        // Patient logic: Poll until the doctor is found
         if (!isDoctor) {
-          const connectToDoctor = () => {
-            const call = peerInstance.call(`doctor-${roomId}`, localStream);
-
-            call.on('stream', (remoteStream) => {
-              clearTimeout(retryTimeout); // Success, stop retrying
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.srcObject = remoteStream;
-              }
-            });
-            
-            call.on('error', (err) => console.error("Patient: Call error:", err));
-          };
-
+          let callInProgress = false;
           peerInstance.on('open', () => {
-            connectToDoctor();
-          });
+            connectionInterval = setInterval(() => {
+              if (callInProgress || peerInstance.disconnected) return;
 
-          peerInstance.on('error', (err) => {
-            if (err.type === 'peer-unavailable') {
-              clearTimeout(retryTimeout);
-              retryTimeout = setTimeout(connectToDoctor, 5000);
-            } else {
-              showError("A connection error occurred.");
-            }
+              callInProgress = true;
+              const call = peerInstance.call(`doctor-${roomId}`, localStream);
+
+              call.on('stream', (remoteStream) => {
+                clearInterval(connectionInterval);
+                if (remoteVideoRef.current) {
+                  remoteVideoRef.current.srcObject = remoteStream;
+                }
+              });
+
+              call.on('error', () => {
+                callInProgress = false; // Allow retry
+              });
+              
+              call.on('close', () => {
+                callInProgress = false; // Allow retry
+              });
+
+            }, 3000); // Try to connect every 3 seconds
           });
         }
 
@@ -102,8 +102,8 @@ const VideoRoom = () => {
     initializePeer();
 
     return () => {
-      clearTimeout(retryTimeout);
-      peer?.destroy();
+      clearInterval(connectionInterval);
+      peerRef.current?.destroy();
       if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
       }
@@ -111,7 +111,7 @@ const VideoRoom = () => {
   }, [roomId, isDoctor, callType]);
 
   const handleEndCall = async () => {
-    peer?.destroy();
+    peerRef.current?.destroy();
     if (isDoctor) {
       await supabase.from('waiting_list').update({ status: 'completed' }).eq('room_id', roomId);
       navigate("/doctor/dashboard");
@@ -121,7 +121,7 @@ const VideoRoom = () => {
   };
 
   const toggleAudio = () => {
-    const stream = (localVideoRef.current?.srcObject as MediaStream) || peer?.connections[Object.keys(peer.connections)[0]][0].peerConnection.getLocalStreams()[0];
+    const stream = localVideoRef.current?.srcObject as MediaStream;
     if (stream) {
       stream.getAudioTracks().forEach(track => track.enabled = !track.enabled);
       setIsMuted(prev => !prev);
