@@ -17,7 +17,7 @@ const VideoRoom = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [peer, setPeer] = useState<Peer | null>(null);
-  const [isDoctor, setIsDoctor] = useState(false);
+  const [isDoctor, setIsDoctor] = useState<boolean | undefined>(undefined);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -31,7 +31,7 @@ const VideoRoom = () => {
   }, []);
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || isDoctor === undefined) return;
 
     let localStream: MediaStream;
 
@@ -77,9 +77,7 @@ const VideoRoom = () => {
       }
     };
 
-    if (isDoctor !== undefined) {
-        initializePeer();
-    }
+    initializePeer();
 
     return () => {
       peer?.destroy();
