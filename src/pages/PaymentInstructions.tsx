@@ -76,7 +76,7 @@ const PaymentInstructions = () => {
               <p className="text-lg">Please send</p>
               <p className="text-4xl font-bold">tk. {amount}</p>
               <p className="text-lg">to the bKash number below:</p>
-              <p className="text-2xl font-mono bg-gray-100 p-2 rounded-md my-2">01234567890</p>
+              <p className="text-2xl font-mono bg-gray-100 p-2 rounded-md my-2">01711350290</p>
             </div>
             <div>
               <p className="font-semibold text-red-600">IMPORTANT:</p>
