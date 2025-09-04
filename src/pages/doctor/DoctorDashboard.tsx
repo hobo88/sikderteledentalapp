@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
-import { Video, Phone, CheckCircle } from "lucide-react";
+import { Video, Phone, CheckCircle, History } from "lucide-react";
 import TitleHeader from "@/components/TitleHeader";
+import { format } from "date-fns";
 
 type Patient = {
   id: string;
@@ -22,6 +23,7 @@ const DoctorDashboard = () => {
   const navigate = useNavigate();
   const [pendingPatients, setPendingPatients] = useState<Patient[]>([]);
   const [waitingList, setWaitingList] = useState<Patient[]>([]);
+  const [completedCalls, setCompletedCalls] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,27 +39,23 @@ const DoctorDashboard = () => {
       const { data, error } = await supabase
         .from("waiting_list")
         .select("*")
-        .in("status", ["pending_payment", "waiting"])
-        .order("created_at", { ascending: true });
+        .in("status", ["pending_payment", "waiting", "completed"])
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching lists:", error);
-        // Don't show toast on every poll failure
       } else {
         const allPatients = data as Patient[];
-        setPendingPatients(allPatients.filter(p => p.status === 'pending_payment'));
-        setWaitingList(allPatients.filter(p => p.status === 'waiting'));
+        setPendingPatients(allPatients.filter(p => p.status === 'pending_payment').sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
+        setWaitingList(allPatients.filter(p => p.status === 'waiting').sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
+        setCompletedCalls(allPatients.filter(p => p.status === 'completed'));
       }
       setLoading(false);
     };
 
     fetchLists();
-
-    const intervalId = setInterval(fetchLists, 5000); // Poll every 5 seconds
-
-    return () => {
-      clearInterval(intervalId);
-    };
+    const intervalId = setInterval(fetchLists, 5000);
+    return () => clearInterval(intervalId);
   }, [navigate]);
 
   const handleConfirmPayment = async (patientId: string) => {
@@ -105,7 +103,7 @@ const DoctorDashboard = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Patient</TableHead>
-                    <TableHead>Room ID</TableHead>
+                    <TableHead>Time</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -115,8 +113,8 @@ const DoctorDashboard = () => {
                   ) : pendingPatients.length > 0 ? (
                     pendingPatients.map((patient) => (
                       <TableRow key={patient.id}>
-                        <TableCell>{patient.patient_name}</TableCell>
-                        <TableCell><Badge variant="secondary">{patient.room_id}</Badge></TableCell>
+                        <TableCell className="font-medium">{patient.patient_name}</TableCell>
+                        <TableCell>{format(new Date(patient.created_at), "p")}</TableCell>
                         <TableCell className="text-right">
                           <Button size="sm" onClick={() => handleConfirmPayment(patient.id)}>
                             <CheckCircle className="mr-2 h-4 w-4" /> Confirm
@@ -141,17 +139,19 @@ const DoctorDashboard = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Patient</TableHead>
+                    <TableHead>Waiting Since</TableHead>
                     <TableHead>Call Type</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow><TableCell colSpan={3} className="text-center">Loading...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center">Loading...</TableCell></TableRow>
                   ) : waitingList.length > 0 ? (
                     waitingList.map((patient) => (
                       <TableRow key={patient.id}>
                         <TableCell className="font-medium">{patient.patient_name}</TableCell>
+                        <TableCell>{format(new Date(patient.created_at), "p")}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {patient.call_type === 'video' ? <Video className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
@@ -164,7 +164,49 @@ const DoctorDashboard = () => {
                       </TableRow>
                     ))
                   ) : (
-                    <TableRow><TableCell colSpan={3} className="text-center py-12 text-gray-500">No patients in the waiting list.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-12 text-gray-500">No patients in the waiting list.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <History className="mr-2 h-5 w-5" />
+                Call History
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Patient</TableHead>
+                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Call Type</TableHead>
+                    <TableHead>Room ID</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow><TableCell colSpan={4} className="text-center">Loading...</TableCell></TableRow>
+                  ) : completedCalls.length > 0 ? (
+                    completedCalls.map((patient) => (
+                      <TableRow key={patient.id}>
+                        <TableCell className="font-medium">{patient.patient_name}</TableCell>
+                        <TableCell>{format(new Date(patient.created_at), "PPpp")}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {patient.call_type === 'video' ? <Video className="h-4 w-4 text-gray-500" /> : <Phone className="h-4 w-4 text-gray-500" />}
+                            <span className="capitalize">{patient.call_type}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell><Badge variant="secondary">{patient.room_id}</Badge></TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow><TableCell colSpan={4} className="text-center py-12 text-gray-500">No completed calls yet.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
