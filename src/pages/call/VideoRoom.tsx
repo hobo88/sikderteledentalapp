@@ -34,6 +34,7 @@ const VideoRoom = () => {
     if (!roomId || isDoctor === undefined) return;
 
     let localStream: MediaStream;
+    let retryTimeout: NodeJS.Timeout;
 
     const initializePeer = async () => {
       try {
@@ -50,17 +51,7 @@ const VideoRoom = () => {
         const peerInstance = new Peer(peerId);
         setPeer(peerInstance);
 
-        peerInstance.on('open', () => {
-          if (!isDoctor) {
-            const call = peerInstance.call(`doctor-${roomId}`, localStream);
-            call.on('stream', (remoteStream) => {
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.srcObject = remoteStream;
-              }
-            });
-          }
-        });
-
+        // Doctor logic: wait for a call
         if (isDoctor) {
           peerInstance.on('call', (call) => {
             call.answer(localStream);
@@ -69,8 +60,39 @@ const VideoRoom = () => {
                 remoteVideoRef.current.srcObject = remoteStream;
               }
             });
+            call.on('error', (err) => console.error("Doctor: Call error:", err));
           });
         }
+
+        // Patient logic: call the doctor, with retries
+        if (!isDoctor) {
+          const connectToDoctor = () => {
+            const call = peerInstance.call(`doctor-${roomId}`, localStream);
+
+            call.on('stream', (remoteStream) => {
+              clearTimeout(retryTimeout); // Success, stop retrying
+              if (remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = remoteStream;
+              }
+            });
+            
+            call.on('error', (err) => console.error("Patient: Call error:", err));
+          };
+
+          peerInstance.on('open', () => {
+            connectToDoctor();
+          });
+
+          peerInstance.on('error', (err) => {
+            if (err.type === 'peer-unavailable') {
+              clearTimeout(retryTimeout);
+              retryTimeout = setTimeout(connectToDoctor, 5000);
+            } else {
+              showError("A connection error occurred.");
+            }
+          });
+        }
+
       } catch (err) {
         console.error("Failed to get media stream", err);
         showError("Could not access camera/microphone. Please check permissions.");
@@ -80,8 +102,11 @@ const VideoRoom = () => {
     initializePeer();
 
     return () => {
+      clearTimeout(retryTimeout);
       peer?.destroy();
-      localStream?.getTracks().forEach(track => track.stop());
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
     };
   }, [roomId, isDoctor, callType]);
 
