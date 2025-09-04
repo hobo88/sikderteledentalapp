@@ -1,6 +1,6 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { PhoneOff, Mic, MicOff, Video, VideoOff, UserCircle } from "lucide-react";
+import { PhoneOff, Mic, MicOff, Video, VideoOff, UserCircle, Loader2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import Peer from "peerjs";
@@ -17,10 +17,12 @@ const VideoRoom = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isDoctor, setIsDoctor] = useState<boolean | undefined>(undefined);
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected'>('connecting');
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerRef = useRef<Peer | null>(null);
+  const connectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -34,7 +36,6 @@ const VideoRoom = () => {
     if (!roomId || isDoctor === undefined) return;
 
     let localStream: MediaStream;
-    let connectionInterval: NodeJS.Timeout;
 
     const initializePeer = async () => {
       try {
@@ -51,7 +52,13 @@ const VideoRoom = () => {
         const peerInstance = new Peer(peerId);
         peerRef.current = peerInstance;
 
-        // Doctor logic: wait for a call
+        peerInstance.on('error', (err) => {
+          console.error("PeerJS error:", err);
+          if (err.type !== 'peer-unavailable') {
+            showError("A connection error occurred. Please refresh the page.");
+          }
+        });
+
         if (isDoctor) {
           peerInstance.on('call', (call) => {
             call.answer(localStream);
@@ -59,37 +66,43 @@ const VideoRoom = () => {
               if (remoteVideoRef.current) {
                 remoteVideoRef.current.srcObject = remoteStream;
               }
+              setConnectionStatus('connected');
             });
-            call.on('error', (err) => console.error("Doctor: Call error:", err));
           });
         }
 
-        // Patient logic: Poll until the doctor is found
         if (!isDoctor) {
-          let callInProgress = false;
           peerInstance.on('open', () => {
-            connectionInterval = setInterval(() => {
-              if (callInProgress || peerInstance.disconnected) return;
+            connectionIntervalRef.current = setInterval(() => {
+              const doctorPeerId = `doctor-${roomId}`;
+              const existingConnection = peerRef.current?.connections[doctorPeerId];
+              
+              if (existingConnection && existingConnection[0]?.open) {
+                if (connectionIntervalRef.current) clearInterval(connectionIntervalRef.current);
+                return;
+              }
+              
+              if (peerRef.current?.disconnected) {
+                if (connectionIntervalRef.current) clearInterval(connectionIntervalRef.current);
+                return;
+              }
 
-              callInProgress = true;
-              const call = peerInstance.call(`doctor-${roomId}`, localStream);
+              const call = peerInstance.call(doctorPeerId, localStream);
 
               call.on('stream', (remoteStream) => {
-                clearInterval(connectionInterval);
+                if (connectionIntervalRef.current) clearInterval(connectionIntervalRef.current);
                 if (remoteVideoRef.current) {
                   remoteVideoRef.current.srcObject = remoteStream;
                 }
+                setConnectionStatus('connected');
               });
 
-              call.on('error', () => {
-                callInProgress = false; // Allow retry
-              });
-              
-              call.on('close', () => {
-                callInProgress = false; // Allow retry
+              call.on('error', (err) => {
+                console.error("Call attempt failed, will retry.", err);
+                call.close();
               });
 
-            }, 3000); // Try to connect every 3 seconds
+            }, 3000);
           });
         }
 
@@ -102,7 +115,9 @@ const VideoRoom = () => {
     initializePeer();
 
     return () => {
-      clearInterval(connectionInterval);
+      if (connectionIntervalRef.current) {
+        clearInterval(connectionIntervalRef.current);
+      }
       peerRef.current?.destroy();
       if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
@@ -135,6 +150,18 @@ const VideoRoom = () => {
     setIsVideoOff(prev => !prev);
   };
 
+  const renderConnectionStatus = () => {
+    if (connectionStatus === 'connecting') {
+      return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-50 z-10">
+          <Loader2 className="h-8 w-8 animate-spin mb-4" />
+          <p className="text-gray-300 text-lg">Connecting to call...</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       <TitleHeader theme="dark" />
@@ -148,7 +175,8 @@ const VideoRoom = () => {
             <>
               <div className="bg-black w-full h-full rounded-lg overflow-hidden flex items-center justify-center">
                 <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                <p className="absolute text-gray-400">Waiting for other user...</p>
+                {connectionStatus === 'connected' && <p className="absolute text-gray-400">Waiting for other user...</p>}
+                {renderConnectionStatus()}
               </div>
               <Card className="absolute bottom-4 right-4 w-48 h-36 md:w-64 md:h-48 border-2 border-gray-600">
                 <CardContent className="p-0 w-full h-full">
@@ -159,11 +187,12 @@ const VideoRoom = () => {
               </Card>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center text-center">
+            <div className="flex flex-col items-center justify-center text-center relative">
               <UserCircle className="h-32 w-32 text-gray-500 mb-4" />
               <h2 className="text-2xl font-bold">Audio Consultation</h2>
-              <p className="text-gray-400 mt-2">Waiting for other user to join...</p>
+              {connectionStatus === 'connected' && <p className="text-gray-400 mt-2">Waiting for other user to join...</p>}
               <video ref={remoteVideoRef} autoPlay playsInline className="hidden" />
+              {renderConnectionStatus()}
             </div>
           )}
         </main>
